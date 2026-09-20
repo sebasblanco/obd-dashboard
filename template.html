@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BimmerLink Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <link rel="stylesheet" href="/dashboard.css">
 </head>
 <body>
@@ -15,6 +17,8 @@
     <span class="sep">/</span>
     <span class="current-time" id="current-time">--:--:--</span>
     <select id="log-select"></select>
+    <button class="btn-compare-toggle" id="btn-compare">Compare</button>
+    <button class="btn-reset-zoom" id="btn-reset-zoom" style="display:none">Reset Zoom</button>
   </div>
   <div class="slider-row">
     <span class="bound-lbl" id="lbl-start">--:--</span>
@@ -41,6 +45,11 @@
     <canvas id="gc-rpm"></canvas>
   </div>
   <div class="charts-grid" id="charts-grid"></div>
+</div>
+
+<div id="view-compare">
+  <div id="compare-legend"></div>
+  <div class="compare-grid" id="compare-grid"></div>
 </div>
 
 <script src="/dashboard.js"></script>
