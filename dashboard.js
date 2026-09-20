@@ -12,6 +12,10 @@ const METRIC_DEFS = [
   ["oil_temp",     "Oil Temp",     "°F",  "#fbbf24"],
   ["oil_pressure", "Oil Pressure", "bar", "#86efac"],
   ["voltage",      "Voltage",      "V",   "#94a3b8"],
+  ["torque",       "Torque",       "Nm",  "#c084fc"],
+  ["lambda",       "Lambda (AFR)", "λ",   "#2dd4bf"],
+  ["gear",         "Gear",         "",    "#fde047"],
+  ["map_slot",     "Map Slot",     "",    "#fca5a5"],
 ];
 
 let TIMELINE = [], ALL = {}, META = {};
@@ -78,7 +82,7 @@ function applyLog(log) {
 
 async function loadLog(name) {
   stop();
-  const log = await fetch(`/api/logs/${name}`).then(r => r.json());
+  const log = await fetch(`/api/logs/${encodeURIComponent(name)}`).then(r => r.json());
   applyLog(log);
 }
 
@@ -121,6 +125,7 @@ function stop() {
 }
 
 btnPlay.addEventListener("click", () => playing ? stop() : play());
+document.addEventListener("keydown", e => { if (e.code === "Space" && !compareMode) { e.preventDefault(); playing ? stop() : play(); } });
 speedBtns.forEach(btn => {
   btn.addEventListener("click", () => {
     speed = parseFloat(btn.dataset.speed);
@@ -180,9 +185,51 @@ Chart.register({
   }
 });
 
+function syncZoom(source) {
+  const { min, max } = source.scales.x;
+  const pool = compareMode ? Object.values(compareChartInstances) : Object.values(chartInstances);
+  for (const c of pool) {
+    if (c === source) continue;
+    c.zoomScale("x", { min, max }, "none");
+  }
+  document.getElementById("btn-reset-zoom").style.display = "";
+}
+
+function resetAllZoom() {
+  for (const c of [...Object.values(chartInstances), ...Object.values(compareChartInstances)]) {
+    c.resetZoom("none");
+  }
+  document.getElementById("btn-reset-zoom").style.display = "none";
+}
+
+const zoomWheel = {
+  zoom: {
+    wheel: { enabled: true },
+    pinch: { enabled: true },
+    mode: "x",
+    onZoomComplete: ({ chart }) => syncZoom(chart),
+  },
+};
+
 const chartOpts = {
   animation: false, responsive: true, maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
+  plugins: { legend: { display: false }, zoom: zoomWheel },
+  elements: { point: { radius: 0 }, line: { borderWidth: 1.5, tension: 0.3 } },
+  scales: {
+    x: { ticks: { color: "#475569", font: { size: 10 }, maxTicksLimit: 6, maxRotation: 0 }, grid: { color: "#1a1a1d" } },
+    y: { grid: { color: "#1e1e23" }, ticks: { color: "#64748b", font: { size: 11 } } }
+  }
+};
+
+const compareChartOpts = {
+  animation: false, responsive: true, maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    zoom: {
+      ...zoomWheel,
+      pan: { enabled: true, mode: "x", onPanComplete: ({ chart }) => syncZoom(chart) },
+    },
+  },
   elements: { point: { radius: 0 }, line: { borderWidth: 1.5, tension: 0.3 } },
   scales: {
     x: { ticks: { color: "#475569", font: { size: 10 }, maxTicksLimit: 6, maxRotation: 0 }, grid: { color: "#1a1a1d" } },
@@ -211,6 +258,7 @@ function attachSeek(canvas) {
   canvas.addEventListener("mousemove",  e => { if (down) seekFromChart(canvas, e.clientX); });
   canvas.addEventListener("mouseup",    () => { down = false; });
   canvas.addEventListener("mouseleave", () => { down = false; });
+  canvas.addEventListener("dblclick",   () => resetAllZoom());
   canvas.addEventListener("touchstart", e => { e.preventDefault(); seekFromChart(canvas, e.touches[0].clientX); }, { passive: false });
   canvas.addEventListener("touchmove",  e => { e.preventDefault(); seekFromChart(canvas, e.touches[0].clientX); }, { passive: false });
 }
@@ -255,8 +303,112 @@ function buildChartCards() {
   }
 }
 
+// ── compare mode ──────────────────────────────────────────────────────────────
+
+const LOG_COLORS = {
+  intake_pipe: { color: "#f97316", label: "Intake",   width: 2.5 },
+  stock_1:     { color: "#38bdf8", label: "Stock 1",  width: 1.5 },
+  stock_2:     { color: "#818cf8", label: "Stock 2",  width: 1.5 },
+  stock_3:     { color: "#34d399", label: "Stock 3",  width: 1.5 },
+};
+
+function logCfg(name) {
+  if (LOG_COLORS[name]) return LOG_COLORS[name];
+  const palette = ["#f472b6", "#fbbf24", "#a3e635", "#22d3ee"];
+  return { color: palette[Object.keys(compareLogs).indexOf(name) % palette.length], label: name, width: 1.5 };
+}
+
+let compareMode = false;
+let compareLogs = {};
+const compareChartInstances = {};
+
+function buildCompareCards() {
+  const grid = document.getElementById("compare-grid");
+  for (const [key, label, unit] of METRIC_DEFS) {
+    const div = document.createElement("div");
+    div.className = "chart-card" + (key === "rpm" ? " cmp-wide" : "");
+    div.id = "cmpcrd-" + key;
+    div.innerHTML =
+      `<div class="chart-card-label">${label} <span class="chart-unit">(${unit})</span></div>` +
+      `<canvas id="cmp-${key}"></canvas>`;
+    grid.appendChild(div);
+  }
+}
+
+function renderCompareLegend(names) {
+  const el = document.getElementById("compare-legend");
+  el.innerHTML = names.map(n => {
+    const cfg = logCfg(n);
+    return `<span class="legend-item"><span class="legend-dot" style="background:${cfg.color}"></span>${cfg.label}</span>`;
+  }).join("");
+}
+
+function renderCompareCharts() {
+  const maxLen = Math.max(...Object.values(compareLogs).map(d => d.timeline.length));
+  const xLabels = Array.from({ length: maxLen }, (_, i) => i);
+
+  for (const [key] of METRIC_DEFS) {
+    const canvas = document.getElementById("cmp-" + key);
+    if (!canvas) continue;
+
+    const datasets = Object.entries(compareLogs).map(([name, logData]) => {
+      const cfg = logCfg(name);
+      return {
+        label: cfg.label,
+        data: logData.all[key] || [],
+        borderColor: cfg.color,
+        backgroundColor: "transparent",
+        borderWidth: cfg.width,
+        fill: false,
+        tension: 0.3,
+        pointRadius: 0,
+      };
+    }).filter(ds => ds.data.some(v => v !== null));
+
+    const card = document.getElementById("cmpcrd-" + key);
+    if (card) card.classList.toggle("no-data", datasets.length === 0);
+
+    if (compareChartInstances[key]) {
+      compareChartInstances[key].data.labels   = xLabels;
+      compareChartInstances[key].data.datasets = datasets;
+      compareChartInstances[key].update("none");
+    } else {
+      compareChartInstances[key] = new Chart(canvas, {
+        type: "line",
+        options: compareChartOpts,
+        data: { labels: xLabels, datasets },
+      });
+      canvas.addEventListener("dblclick", () => resetAllZoom());
+    }
+  }
+}
+
+async function loadCompare() {
+  const names = await fetch("/api/logs").then(r => r.json());
+  const query  = names.map(encodeURIComponent).join(",");
+  compareLogs  = await fetch(`/api/compare?logs=${query}`).then(r => r.json());
+  renderCompareLegend(names);
+  renderCompareCharts();
+}
+
+function setCompareMode(on) {
+  compareMode = on;
+  document.getElementById("view-graph").style.display   = on ? "none" : "";
+  document.getElementById("view-compare").style.display = on ? "block" : "none";
+  document.querySelector(".slider-row").style.display   = on ? "none" : "";
+  document.getElementById("btn-play").style.display     = on ? "none" : "";
+  document.querySelector(".speed-btns").style.display   = on ? "none" : "";
+  document.getElementById("log-select").style.display   = on ? "none" : "";
+  document.getElementById("btn-compare").classList.toggle("active", on);
+  if (on && Object.keys(compareLogs).length === 0) loadCompare();
+}
+
+document.getElementById("btn-compare").addEventListener("click", () => setCompareMode(!compareMode));
+document.getElementById("btn-reset-zoom").addEventListener("click", resetAllZoom);
+
 async function init() {
   buildChartCards();
+  buildCompareCards();
   const names  = await fetch("/api/logs").then(r => r.json());
   const select = document.getElementById("log-select");
   select.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join("\n");

@@ -10,6 +10,11 @@ def detect_format(path):
         header = f.readline()
     if "SECONDS" in header.upper() and ";" in header:
         return "long"
+    # bootmod3 exports share the same Time,... comma header shape as "wide," but
+    # carry their own column names (units baked into the header, e.g. "Gear[-]"),
+    # so WIDE_PID never matches them — check for a BM3-only column first.
+    if "Torque at Clutch" in header:
+        return "bm3"
     if header.upper().startswith("TIME"):
         return "wide"
     return "unknown"
@@ -27,6 +32,7 @@ LONG_PID = {
     "intake_temp":["Intake air temperature"],
     "timing":     ["Timing advance"],
     "accel":      ["Vehicle acceleration"],
+    "lambda":     ["Fuel/Air commanded equivalence ratio", "Oxygen sensor 1 Wide Range Equivalence ratio"],
 }
 
 def load_long(path):
@@ -78,7 +84,13 @@ WIDE_PID = {
     "oil_temp":     ["Oil temperature"],
     "oil_pressure": ["Oil pressure"],
     "voltage":      ["Current battery voltage"],
+    "lambda":       ["Lambda actual value"],
+    "torque":       ["Coordinated target torque on the wheel"],
 }
+
+# lb fuel / hp-hr — typical turbo direct-injection gasoline estimate, used to
+# back into an estimated crank hp from fuel flow when no dyno/torque channel exists
+BSFC = 0.50
 
 def load_wide(path):
     df = pd.read_csv(path, header=0)
@@ -105,13 +117,87 @@ def build_wide(p):
         for col in col_names:
             if col not in p.columns:
                 continue
-            vals  = [round(float(v), 2) if pd.notna(v) else None for v in p[col]]
+            series = p[col]
+            if key == "lambda":
+                # sensor reports 0 during warmup and pins at a 16.0 sentinel
+                # during decel fuel cut — neither is a real air-fuel reading
+                series = series.where(series.between(0.5, 1.3))
+            vals  = [round(float(v), 2) if pd.notna(v) else None for v in series]
             valid = [v for v in vals if v is not None]
             if not valid:
                 continue
             all_data[key] = vals
             meta[key] = {"min": round(min(valid), 2), "max": round(max(valid), 2)}
             break
+
+    # derived: estimated crank hp from fuel flow, so logs without a power PID
+    # (anything that isn't a stock BimmerLink long-format export) still get one.
+    # Prefers measured fuel mass flow; falls back to air mass flow / lambda.
+    # BimmerLink's wide-export Air/Fuel mass flow PIDs are in kg/h, not g/s.
+    fuel_kg_h = None
+    if "Fuel mass flow" in p.columns:
+        fuel_kg_h = p["Fuel mass flow"]
+    elif "Air mass flow" in p.columns and "Lambda actual value" in p.columns:
+        lam = p["Lambda actual value"].where(p["Lambda actual value"].between(0.5, 1.3))
+        fuel_kg_h = p["Air mass flow"] / (14.7 * lam)
+
+    if fuel_kg_h is not None:
+        hp = fuel_kg_h * 2.20462 / BSFC  # kg/h -> lb/hr -> hp @ BSFC
+        vals  = [round(float(v), 1) if pd.notna(v) and v > 0 else None for v in hp]
+        valid = [v for v in vals if v is not None]
+        if valid:
+            all_data["power"] = vals
+            meta["power"] = {"min": round(min(valid), 2), "max": round(max(valid), 2)}
+
+    return timeline, all_data, meta
+
+# ── bm3 format (bootmod3 export) ──────────────────────────────────────────────
+
+BM3_PID = {
+    "rpm":         ["Engine speed[1/min]"],
+    "speed":       ["Vehicle Speed[mph]"],
+    "throttle":    ["Throttle Angle[%]"],
+    "boost":       ["Boost (Pre-Throttle)[psig]"],
+    "coolant":     ["Coolant Temp[F]"],
+    "intake_temp": ["IAT[F]"],
+    "lambda":      ["Lambda Act.[AFR]"],
+    "gear":        ["Gear[-]"],
+    "map_slot":    ["(BM3) Map Slot[]"],
+    "torque":      ["(RAM) Torque at Clutch (Actual)[Nm]"],
+}
+
+def build_bm3(p):
+    timeline = [to_elapsed(s) for s in p.index]
+    all_data, meta = {}, {}
+    for key, col_names in BM3_PID.items():
+        for col in col_names:
+            if col not in p.columns:
+                continue
+            series = p[col]
+            if key == "lambda":
+                series = series.where(series.between(0.5, 1.3))
+            vals = [round(float(v), 2) if pd.notna(v) else None for v in series]
+            if key in ("gear", "map_slot"):
+                vals = [round(v, 0) if v is not None else None for v in vals]
+            valid = [v for v in vals if v is not None]
+            if not valid:
+                continue
+            all_data[key] = vals
+            meta[key] = {"min": round(min(valid), 2), "max": round(max(valid), 2)}
+            break
+
+    # derived: real crank-equivalent hp. Unlike plain "wide" logs (which only have
+    # wheel torque and need a fuel-flow/BSFC estimate), BM3 exposes actual crank
+    # torque directly via "Torque at Clutch," so HP = T x RPM / 7127 is exact,
+    # not an approximation.
+    if "rpm" in all_data and "torque" in all_data:
+        hp = [round(t * r / 7127, 1) if (t is not None and r is not None) else None
+              for t, r in zip(all_data["torque"], all_data["rpm"])]
+        valid = [v for v in hp if v is not None]
+        if valid:
+            all_data["power"] = hp
+            meta["power"] = {"min": round(min(valid), 2), "max": round(max(valid), 2)}
+
     return timeline, all_data, meta
 
 # ── load all logs ─────────────────────────────────────────────────────────────
@@ -127,6 +213,8 @@ def load_all_logs(logs_dir):
                 tl, ad, m = build_long(pivot_long(load_long(path)))
             elif fmt == "wide":
                 tl, ad, m = build_wide(pivot_wide(load_wide(path)))
+            elif fmt == "bm3":
+                tl, ad, m = build_bm3(pivot_wide(load_wide(path)))
             else:
                 print("    skipped (unknown format)"); continue
             logs[name] = {"timeline": tl, "all": ad, "meta": m}
@@ -151,5 +239,9 @@ METRICS = [
     ("oil_temp",    "Oil Temp",     "°F",  "#fbbf24"),
     ("oil_pressure","Oil Pressure", "bar", "#86efac"),
     ("voltage",     "Voltage",      "V",   "#94a3b8"),
+    ("torque",      "Torque",       "Nm",  "#c084fc"),
+    ("lambda",      "Lambda (AFR)", "λ",   "#2dd4bf"),
+    ("gear",        "Gear",         "",    "#fde047"),
+    ("map_slot",    "Map Slot",     "",    "#fca5a5"),
 ]
 
