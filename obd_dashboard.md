@@ -213,3 +213,58 @@ Roughly +30-34 hp / +11-12% across the board. (Loading both logs into the dashbo
 - If the 2nd-gear launch-hold behavior is unwanted (e.g. it's costing a measurable chunk of a straight-line time attack), that's a map-slot tuning question for whoever built Map Slot 3 — not a dashboard or diagnostic action item.
 - Still no BimmerLink-side timing/knock PID — if a future BimmerLink (non-BM3) log matters for tune verification, that gap from 2026-09-06 is still open.
 - Continue watching AFR under boost on the "wide"-format logs per the 2026-09-28 note — this session's log was BM3, so it doesn't resolve that open thread.
+
+---
+
+# Session — 2026-09-30 (part 2)
+
+## Full comparison: every real log on disk, gear by gear
+
+Compared all 8 real logs (excludes the synthetic HYPOTHETICAL mock above). WOT filter: BM3 logs use `Accel. Pedal[%] >= 95` as before; the "wide"-format logs actually do have a real pedal column (`Normalized Accelerator Pedal Angle` / lowercase in `stage 2_1`) that earlier ad-hoc scripts this session missed on the first pass — corrected to use it, same `>=95` threshold, instead of a cruder boost-setpoint proxy. `stock.csv` has no gear channel and its own throttle-position PID tops out at 88.6% in this drive, so its WOT window uses `Throttle position >= 80` instead.
+
+**BM3 logs (measured crank torque, `HP = Torque×RPM/7127` — the trustworthy number):**
+
+| Log | Map Slot | Gear | Peak HP | @ RPM | AFR (min-max, mean) | λ mean | Boost act/tgt @peak | Timing @peak | Knock rows |
+|---|---|---|---|---|---|---|---|---|---|
+| multi_1 | 3 | 2 | 304.6 | 6446 | 12.3-15.7, 13.7 | 0.929 | 18.2/19.4 psi | 9.5° | 1 |
+| multi_1 | 3 | 3 | 292.9 | 6493 | 12.3-13.6, 12.6 | 0.854 | 17.2/18.8 psi | 7.5° | 0 |
+| multi_1 | 3 | 4 | 268.4 | 5547 | 11.8-17.6, 12.6 | 0.859 | 18.2/20.6 psi | 3.5° | 0 |
+| multi_2-3 | 3 | 2 | 276.8 | 5645 | 12.4-16.1, 13.9 | 0.948 | 17.4/19.1 psi | 6.7° | 0 |
+| multi_2-3 | 3 | 3 | 269.3 | 5742 | 12.4-15.2, 13.1 | 0.889 | 15.7/19.1 psi | 7.2° | 0 |
+| multi_2-3 | 3 | 4 | 263.7 | 5365 | 12.4-16.5, 12.9 | 0.879 | 18.2/21.4 psi | 4.8° | 0 |
+| multi_2-3 | 3 | 5 | 251.1 | 5127 | 12.4-16.6, 13.8 | 0.937 | 18.3/21.6 psi | 3.7° | 0 |
+| stage2_2 | 1 | 1 | 238.4 | 5140 | 11.9-13.0, 12.3 | 0.838 | 15.6/17.4 psi | 4.2° | 0 |
+| stage2_2 | 1 | 2 | 270.0 | 5706 | 11.2-13.1, 12.0 | 0.816 | 24.0/21.7 psi | 0.7° | 0 |
+| stage2_2 | 1 | 3 | 254.7 | 5519 | 11.9-14.9, 12.2 | 0.832 | 18.7/21.8 psi | 4.5° | 1 |
+| stage2_3 | 1 | 3 | 272.5 | 5719 | 12.0-12.8, 12.3 | 0.837 | 19.4/22.3 psi | 5.5° | 0 |
+
+**Wide-format logs (fuel-flow/BSFC 0.50 estimate — a different, less exact calc method than the BM3 crank-torque numbers above; tune identity here is inferred from filename, not a logged Map Slot value):**
+
+| Log | Tune (by name) | Gear | Peak HP | @ RPM | AFR (min-max, mean) | λ mean | Boost act/tgt @peak |
+|---|---|---|---|---|---|---|---|
+| multi_2-1 | "93 multi" (Slot 3) | 4 | 219.3 | 4626 | 12.8-14.8, 13.9 | 0.947 | 18.3/20.1 psi |
+| multi_2-1 | "93 multi" (Slot 3) | 5 | 206.8 | 4002 | 12.8-13.8, 13.7 | 0.935 | 17.0/21.6 psi |
+| multi_2-1 | "93 multi" (Slot 3) | 6 | 206.8 | 4385 | 13.8-14.0, 13.9 | 0.945 | 18.2/21.6 psi |
+| multi_2-2 | "93 multi" (Slot 3) | 3 | 293.6 | 5087 | 12.5-14.7, 13.6 | 0.924 | 16.3/18.6 psi |
+| multi_2-2 | "93 multi" (Slot 3) | 4 | 293.6 | 6136 | 12.5 (single sample) | 0.850 | 15.8/18.6 psi |
+| multi_2-2 | "93 multi" (Slot 3) | 5 | 247.0 | 4624 | 12.5-12.9, 12.9 | 0.878 | 17.9/20.6 psi |
+| multi_2-2 | "93 multi" (Slot 3) | 6 | 246.8 | 3768 | 12.9-13.8, 13.7 | 0.931 | 18.2/22.1 psi |
+| stage2_1 | "stage 2" (Slot 1) | 1 | 290.3 | 5104 | 11.9 (single sample) | 0.810 | 19.7/20.1 psi |
+| stage2_1 | "stage 2" (Slot 1) | 2 | 290.3 | 5844 | 11.9-12.1, 12.0 | 0.819 | 16.2/20.1 psi |
+
+`multi_2-1`'s gear 4/5/6 richer-than-usual AFR (mean 13.7-13.9) is the same real lean trend already flagged in the 2026-09-28 entry — not new here. `multi_2-2` and `stage2_1`'s repeated identical HP values per gear (293.6 twice, 290.3 twice) reflect very short WOT windows in those specific logs (a handful of rows per gear, sometimes just one) rather than a real plateau — same caveat already on record for `stage2_1` in the 2026-09-13 entry (14 total WOT rows in one ~2s window).
+
+**stock.csv**: no gear channel, so no per-gear breakdown. Peak 325.6 hp @ 5700 rpm from BimmerLink's own fuel-consumption power PID — a third, different calc method from both tables above, so **not directly comparable** (same standing caveat since 2026-09-06/09-13: don't read this as "stock beats the tunes"). WOT-window (throttle≥80%) AFR ran 13.1-14.4 (λ 0.89-0.98, mean 0.94) — noticeably leaner/closer to stoich than any tuned pull, consistent with a conservative stock calibration. Boost only reached 0.57 bar (~8 psi) at that throttle level — stock turbo, no meaningful boost target to speak of. `Timing advance` PID in this log has only 19 samples total, all reading exactly 0.0 — not real data (sensor/PID wasn't actually populated in this session), so timing isn't usable from this log.
+
+## Which tune is best so far
+
+**Map Slot 3 ("93 multi") is ahead, by a real but modest margin** — roughly 15-30 hp higher than Map Slot 1 ("stage 2," no XHP) at comparable gears, on the two BM3-measured pulls of each: 2nd gear 304.6 & 276.8 hp (Slot 3) vs. 270.0 hp (Slot 1); 3rd gear 292.9 & 269.3 hp (Slot 3) vs. 254.7 & 272.5 hp (Slot 1) — the gap is consistent but not enormous, and `stage2_3`'s 272.5 hp 3rd-gear pull actually lands right in Slot 3's own 3rd-gear range, so this isn't a blowout.
+
+Caveats on that verdict, stated plainly rather than papered over:
+- **These pulls weren't run back-to-back same-day** — some of the gap (especially multi_1's outlier 304.6 hp at 6446 rpm, higher than any other pull's rev ceiling) may reflect the pull simply being held further into the rev range or better ambient/fuel conditions that day, not a stronger tune at the same point in the curve. This is the same "don't overclaim from thin data" caveat already on record from 2026-09-13's XHP-vs-Slot-3 comparison.
+- **Fueling margin favors Slot 1, not Slot 3.** Slot 1's pulls ran tighter and richer (AFR means 12.0-12.3, λ ~0.82-0.84) than Slot 3's (AFR means 12.6-13.9, λ ~0.85-0.95) — Slot 1 is the more conservative map on paper, Slot 3 is leaning further toward the thinner end of "safe" as its pulls go on.
+- **Knock is a wash, not a differentiator.** Each map produced exactly one isolated knock-flagged row under real WOT boost this comparison (`multi_1` gear 2 @ 17.5 psi/4597 rpm; `stage2_2` gear 3 @ 16.9 psi/3873 rpm) — both single-sample, both with timing already conservative at that instant, neither map is cleaner than the other here.
+- **Boost overshoot**: `stage2_2`'s 2nd gear ran +2.3 psi over target (24.0 vs 21.7) — the largest overshoot in this whole comparison, on Slot 1. Every Slot 3 pull tracked within its target band or slightly under (normal turbo lag), no comparable overshoot.
+- **XHP isn't in this comparison** — the raw XHP log file (`93 multi_xhp.csv`) is no longer in `logs/` (superseded by the `multi_2-x` files this session). The 2026-09-13 finding (XHP on top of Slot 1: 293/288 hp, a close second to Slot 3) still stands as the last word on XHP specifically, just not re-verified here.
+
+**Bottom line**: if "best" means peak power, Slot 3 is the answer today, by a real if unspectacular margin. If "best" means the more conservative, higher-margin map, that's Slot 1. Neither is unsafe based on what's logged — no sustained lean-under-load, no repeated knock, boost tracking within normal ranges on both. Given the size of the gap and the lack of same-day back-to-back pulls, this is "Slot 3 looks stronger so far" rather than a settled result — the clean way to close it out would be 2-3 same-day pulls of each map in the same gear/rev range, which is the same ask already sitting in the 2026-09-13 "what's next."
