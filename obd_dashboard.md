@@ -197,7 +197,16 @@ Following a discussion about whether this tune should run richer for more power 
 
 **This is synthetic/illustrative data, not a real pull or a validated tune — do not analyze it as if it were measured.** Generated from `93 multi_2-3.csv` by leaving every non-WOT row and the 2nd-gear launch-control window (Time<17.53s) completely untouched, and for every other WOT row: +3 psi boost (all boost target/actual columns), +2.5° ignition timing (all 4 cylinders), and AFR richened by 1.0 point. Torque at Clutch was rescaled by a rule-of-thumb (`new/old absolute boost ratio × (1 + 1%/deg timing added)`) — a reasonable order-of-magnitude illustration, not a physics simulation; real gains depend on this engine's actual knock limit and fuel-system/turbo headroom at the new targets.
 
-**Result (via the dashboard's own per-second pipeline, so directly comparable to what's on-screen):** peak HP up ~24-30 hp per gear (2nd: 223.7→251.5, 3rd: 241.3→269.8, 4th: 251.8→281.8, 5th: 201.6→225.3) — roughly +11-12% across the board. Load both logs into Compare view to see it side by side.
+**Result (raw-sample peak, same method as the "Peak crank HP by gear" table above — apples-to-apples against the 276.8/269.3/263.7/251.1 hp real figures):**
+
+| Gear | Real | Mock | Delta |
+|---|---|---|---|
+| 2 | 276.8 | 310.2 | +33.4 |
+| 3 | 269.3 | 303.3 | +34.0 |
+| 4 | 263.7 | 294.9 | +31.2 |
+| 5 | 251.1 | 280.7 | +29.6 |
+
+Roughly +30-34 hp / +11-12% across the board. (Loading both logs into the dashboard's Compare view will show *lower* absolute numbers for both — its per-second averaging pipeline smooths off a brief instantaneous peak, e.g. real 2nd gear reads 223.7 hp there instead of 276.8 — but the percentage gain and the direction of the comparison hold either way. Use the raw-sample table above for the actual peak-hp claim, not the Compare view's numbers.)
 
 ## What's next
 - The BM3 lambda fix and new timing/knock metrics apply to every BM3 log already on disk — worth a quick look at `multi_1.csv`'s timing/knock charts next time it's open, since that log was never checked for this before.
