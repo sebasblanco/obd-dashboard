@@ -1,3 +1,6 @@
+# Car
+2020 BMW 330i (confirmed by the user 2026-09-30) — B46 turbo inline-4, consistent with all the PID sets seen so far (Ignition Timing 1-4, no cylinders 5/6).
+
 # Session — 2026-06-10
 
 ## What we built
