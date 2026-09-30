@@ -192,6 +192,13 @@ A smooth, monotonic per-gear decline — no red flags in the shape of the curve.
 
 **Thermals**: coolant peaked 212°F, IAT peaked 102°F — normal, no heat-soak concern.
 
+## Hypothetical: richer AFR + more boost/timing, modeled as a synthetic log
+Following a discussion about whether this tune should run richer for more power (short answer: no, not by itself — richness past ~11.5-12.5:1 AFR is a knock-margin lever, not a direct power lever; this car's WOT AFR is already on the rich side of that window), built a synthetic BM3-format CSV to visualize what spending that margin on more boost/timing might look like: `logs/93 multi_2-3_HYPOTHETICAL-richer-boost-timing.csv`.
+
+**This is synthetic/illustrative data, not a real pull or a validated tune — do not analyze it as if it were measured.** Generated from `93 multi_2-3.csv` by leaving every non-WOT row and the 2nd-gear launch-control window (Time<17.53s) completely untouched, and for every other WOT row: +3 psi boost (all boost target/actual columns), +2.5° ignition timing (all 4 cylinders), and AFR richened by 1.0 point. Torque at Clutch was rescaled by a rule-of-thumb (`new/old absolute boost ratio × (1 + 1%/deg timing added)`) — a reasonable order-of-magnitude illustration, not a physics simulation; real gains depend on this engine's actual knock limit and fuel-system/turbo headroom at the new targets.
+
+**Result (via the dashboard's own per-second pipeline, so directly comparable to what's on-screen):** peak HP up ~24-30 hp per gear (2nd: 223.7→251.5, 3rd: 241.3→269.8, 4th: 251.8→281.8, 5th: 201.6→225.3) — roughly +11-12% across the board. Load both logs into Compare view to see it side by side.
+
 ## What's next
 - The BM3 lambda fix and new timing/knock metrics apply to every BM3 log already on disk — worth a quick look at `multi_1.csv`'s timing/knock charts next time it's open, since that log was never checked for this before.
 - If the 2nd-gear launch-hold behavior is unwanted (e.g. it's costing a measurable chunk of a straight-line time attack), that's a map-slot tuning question for whoever built Map Slot 3 — not a dashboard or diagnostic action item.
