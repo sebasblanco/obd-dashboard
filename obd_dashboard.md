@@ -1,5 +1,5 @@
 # Car
-2020 BMW 330i (confirmed by the user 2026-09-30) — B46 turbo inline-4, consistent with all the PID sets seen so far (Ignition Timing 1-4, no cylinders 5/6).
+2020 BMW 330i (confirmed by the user 2026-09-30) — B46 turbo inline-4, consistent with all the PID sets seen so far (Ignition Timing 1-4, no cylinders 5/6). Previously had a 2018 BMW 530i, totaled by someone else in November 2024; the 330i was acquired in January 2025 as the replacement and is the car all logs/tuning in this project are for.
 
 # Session — 2026-06-10
 
@@ -268,3 +268,6 @@ Caveats on that verdict, stated plainly rather than papered over:
 - **XHP isn't in this comparison** — the raw XHP log file (`93 multi_xhp.csv`) is no longer in `logs/` (superseded by the `multi_2-x` files this session). The 2026-09-13 finding (XHP on top of Slot 1: 293/288 hp, a close second to Slot 3) still stands as the last word on XHP specifically, just not re-verified here.
 
 **Bottom line**: if "best" means peak power, Slot 3 is the answer today, by a real if unspectacular margin. If "best" means the more conservative, higher-margin map, that's Slot 1. Neither is unsafe based on what's logged — no sustained lean-under-load, no repeated knock, boost tracking within normal ranges on both. Given the size of the gap and the lack of same-day back-to-back pulls, this is "Slot 3 looks stronger so far" rather than a settled result — the clean way to close it out would be 2-3 same-day pulls of each map in the same gear/rev range, which is the same ask already sitting in the 2026-09-13 "what's next."
+
+## bootmod3 app access check (2026-09-30)
+User asked about applying for BM3 "tuner access" to edit each of the 4 maps on the multimap directly. Checked this Mac: `/Applications/bootmod3.app` (`com.bootmod3.mobile`) is installed, along with the car's coded vehicle profile and local logs under `~/Documents/bootmod3_data/` — but this is the standard consumer flash/log client (select a pre-built map, flash it, pull logs), not a map-authoring tool. No evidence of a separate Tuner Suite build on this machine. Editing the multimap's individual maps requires bootmod3/dinantech's actual **Tuner Cert program**, which is a business-side application/certification process through their website (historically leaning toward professional shops with dyno access and insurance) — not something checkable or actionable from local files. If the user wants to pursue this, it'd need a web lookup of their current application requirements, not a local check.
