@@ -16,6 +16,7 @@ const METRIC_DEFS = [
   ["lambda",       "Lambda (AFR)", "λ",   "#2dd4bf"],
   ["gear",         "Gear",         "",    "#fde047"],
   ["map_slot",     "Map Slot",     "",    "#fca5a5"],
+  ["knock",        "Knock",        "",    "#ef4444"],
 ];
 
 let TIMELINE = [], ALL = {}, META = {};

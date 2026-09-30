@@ -164,6 +164,8 @@ BM3_PID = {
     "gear":        ["Gear[-]"],
     "map_slot":    ["(BM3) Map Slot[]"],
     "torque":      ["(RAM) Torque at Clutch (Actual)[Nm]"],
+    "timing":      ["Ignition Timing 1[deg]"],
+    "knock":       ["Knock Detected[0-n]"],
 }
 
 def build_bm3(p):
@@ -175,9 +177,15 @@ def build_bm3(p):
                 continue
             series = p[col]
             if key == "lambda":
+                # BM3's "Lambda Act.[AFR]" is raw AFR (~12-19 for gasoline, stoich
+                # 14.7) despite the metric being called "lambda" everywhere else
+                # in this dashboard as a unitless ratio (~0.5-1.3) — convert so
+                # it's comparable across formats instead of getting filtered
+                # to nothing by the 0.5-1.3 sanity clamp below.
+                series = series / 14.7
                 series = series.where(series.between(0.5, 1.3))
             vals = [round(float(v), 2) if pd.notna(v) else None for v in series]
-            if key in ("gear", "map_slot"):
+            if key in ("gear", "map_slot", "knock"):
                 vals = [round(v, 0) if v is not None else None for v in vals]
             valid = [v for v in vals if v is not None]
             if not valid:
@@ -243,5 +251,6 @@ METRICS = [
     ("lambda",      "Lambda (AFR)", "λ",   "#2dd4bf"),
     ("gear",        "Gear",         "",    "#fde047"),
     ("map_slot",    "Map Slot",     "",    "#fca5a5"),
+    ("knock",       "Knock",        "",    "#ef4444"),
 ]
 
