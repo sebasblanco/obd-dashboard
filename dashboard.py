@@ -185,8 +185,14 @@ def build_bm3(p):
                 series = series / 14.7
                 series = series.where(series.between(0.5, 1.3))
             vals = [round(float(v), 2) if pd.notna(v) else None for v in series]
-            if key in ("gear", "map_slot", "knock"):
+            if key in ("gear", "map_slot"):
                 vals = [round(v, 0) if v is not None else None for v in vals]
+            elif key == "knock":
+                # knock is a rare single-row event (~12 samples/sec get averaged
+                # into one second by pivot_wide) — round-to-nearest would wash an
+                # isolated hit out to 0 if most of that second's rows were clean.
+                # Flag the whole second if any sample in it saw knock.
+                vals = [1 if (v is not None and v > 0) else (0 if v is not None else None) for v in vals]
             valid = [v for v in vals if v is not None]
             if not valid:
                 continue
